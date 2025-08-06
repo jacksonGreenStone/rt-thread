@@ -30,7 +30,7 @@ ARCH        ='arm'
 CPU         ='cortex-a'
 CROSS_TOOL  = 'gcc'
 PLATFORM    = 'gcc'
-EXEC_PATH   = os.getenv('RTT_EXEC_PATH') or r'/usr/bin'
+EXEC_PATH   = '/opt/gcc-arm-none-eabi-6_2-2016q4/bin'
 BUILD       = 'debug'
 
 LINK_SCRIPT = 'link.lds'

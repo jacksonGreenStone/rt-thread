@@ -20,12 +20,12 @@ struct acm32_wdt_obj
 {
     union
     {
-        WDT_HandleTypeDef       wdt;
-        IWDT_HandleTypeDef      iwdt;
+        WDT_HandleTypeDef       wdt;    //窗口看门狗句柄
+        IWDT_HandleTypeDef      iwdt;   //独立看门狗句柄
     } handle;
-    rt_uint16_t             is_start;
-    rt_uint16_t             type;
-    rt_watchdog_t           watchdog;
+    rt_uint16_t             is_start;   //看门狗是否启动标志
+    rt_uint16_t             type;       //看门狗类型（窗口或独立）
+    rt_watchdog_t           watchdog;   //RT_Thread看门狗设备结构，位置：component/drivers
 };
 
 #define TYPE_WDT         0
@@ -43,7 +43,7 @@ struct acm32_wdt_obj
 #endif
 
 static struct rt_watchdog_ops ops;
-
+//通过适当选择分频系数，使得看门狗定时器能够在不溢出的情况下实现期望的超时时间
 rt_inline rt_base_t calc_wdt_divisor_load(rt_uint32_t freq, rt_uint32_t sec, rt_uint32_t *divisor, rt_uint32_t *load)
 {
     rt_uint32_t freqMaxSec = 0;
@@ -130,13 +130,13 @@ static rt_err_t wdt_control(rt_watchdog_t *wdt, int cmd, void *arg)
 
     RT_ASSERT(wdt != RT_NULL);
 
-    wdtObj = rt_container_of(wdt, struct acm32_wdt_obj, watchdog);
-    timer_clk_hz = System_Get_APBClock();
-
+    wdtObj = rt_container_of(wdt, struct acm32_wdt_obj, watchdog);//获取看门狗对象
+    timer_clk_hz = System_Get_APBClock();//获取系统时钟频率
+    /* acm_wdg funciton branch*/
     switch (cmd)
     {
     /* feed the watchdog */
-    case RT_DEVICE_CTRL_WDT_KEEPALIVE:
+    case RT_DEVICE_CTRL_WDT_KEEPALIVE://"喂狗"操作，重置看门狗计数器，防止系统复位
         if (TYPE_WDT == wdtObj->type)
         {
             HAL_WDT_Feed(&wdtObj->handle.wdt);
@@ -207,7 +207,7 @@ static rt_err_t wdt_control(rt_watchdog_t *wdt, int cmd, void *arg)
                                       wdtObj->handle.iwdt.Init.Reload);
         }
         break;
-    case RT_DEVICE_CTRL_WDT_START:
+    case RT_DEVICE_CTRL_WDT_START://启动开门狗
         if (TYPE_WDT == wdtObj->type)
         {
             wdtObj->handle.wdt.Instance = WDT;
@@ -243,10 +243,10 @@ static rt_err_t wdt_control(rt_watchdog_t *wdt, int cmd, void *arg)
 }
 
 int rt_wdt_init(void)
-{
+{   //MOTE: 注册fops
     ops.init = &wdt_init;
     ops.control = &wdt_control;
-
+    //设备注册
 #ifdef BSP_USING_WDT
     acm32_wdt.type = TYPE_WDT;
     acm32_wdt.is_start = 0;
@@ -268,7 +268,28 @@ int rt_wdt_init(void)
 
     return RT_EOK;
 }
-INIT_BOARD_EXPORT(rt_wdt_init);
+INIT_BOARD_EXPORT(rt_wdt_init);//作用是将 rt_wdt_init 函数注册为板级初始化函数，使其在系统启动时自动被调用。
 
 #endif /* RT_USING_WDT */
 
+/*
+    @Breif: 解释 RT设备驱动框架
+#define INIT_BOARD_EXPORT(fn)  INIT_EXPORT(fn, "1")
+
+级别"0"：系统最开始初始化
+级别"1"：板级初始化（BOARD_EXPORT）
+级别"2"：设备初始化（DEVICE_EXPORT）
+级别"3"：组件初始化（COMPONENT_EXPORT）
+级别"4"：文件系统初始化（FS_EXPORT）
+级别"5"：环境变量初始化（ENV_EXPORT）
+级别"6"：应用初始化（APP_EXPORT）
+
+实际实现： 根据编译器和配置不同，INIT_EXPORT 宏会将函数指针放置在特定的段（section）中，例如：
+
+rt_used const init_fn_t __rt_init_##fn rt_section(".rti_fn." level) = fn
+这样在链接时，所有标记为同一级别的函数会被放在连续的内存区域中。
+
+自动调用： 系统启动时，在 rt_components_board_init() 函数中会遍历级别为"1"的所有函数并依次调用它们。
+
+
+*/
