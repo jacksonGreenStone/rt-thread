@@ -159,7 +159,7 @@ int __low_level_init(void)
 /* Add -eentry to arm-none-eabi-gcc argument */
 int entry(void)
 {
-    rtthread_startup();
+    rtthread_startup();//MOTE: RT startup entry
     return 0;
 }
 #endif
